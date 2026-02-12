@@ -4,40 +4,32 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { animals, textToFilename, type Animal } from "./data";
 
 export default function Home() {
-  const [activeMoles, setActiveMoles] = useState<Set<string>>(new Set());
+  const [activeMole, setActiveMole] = useState<Animal | null>(null);
   const [currentHint, setCurrentHint] = useState<Animal | null>(null);
   const [score, setScore] = useState(0);
-  const moleTimers = useRef<Record<string, NodeJS.Timeout>>({});
+  const moleTimer = useRef<NodeJS.Timeout | null>(null);
 
-  const startSpawning = useCallback(() => {
-    const spawnInterval = setInterval(() => {
-      const availableAnimals = animals.filter(a => !activeMoles.has(a.letter));
-      if (availableAnimals.length === 0) return;
+  // 开始出题：显示一个动物让小孩按
+  const startNewMole = useCallback(() => {
+    if (activeMole) return; // 已有老鼠，先打中
 
-      const animal = availableAnimals[Math.floor(Math.random() * availableAnimals.length)];
+    const availableAnimals = animals.filter(a => true);
+    const animal = availableAnimals[Math.floor(Math.random() * availableAnimals.length)];
 
-      if (moleTimers.current[animal.letter]) {
-        clearTimeout(moleTimers.current[animal.letter] as NodeJS.Timeout);
+    setActiveMole(animal);
+    playSound(animal.sound);
+
+    // 设置提示
+    setCurrentHint(animal);
+
+    // 老鼠一直冒头，直到被打中或超时（10秒自动换下一个）
+    const timer = setTimeout(() => {
+      if (activeMole) { // 如果还没被打中，自动换下一个
+        startNewMole();
       }
-
-      setActiveMoles(prev => new Set([...prev, animal.letter]));
-      playSound(animal.sound);
-      setCurrentHint(animal);
-
-      const timer = setTimeout(() => {
-        setActiveMoles(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(animal.letter);
-          return newSet;
-        });
-        setCurrentHint(null);
-      }, 7000);
-
-      moleTimers.current[animal.letter] = timer as NodeJS.Timeout;
-    }, 1500);
-
-    return () => clearInterval(spawnInterval);
-  }, [activeMoles]);
+    }, 10000);
+    moleTimer.current = timer;
+  }, [activeMole, score]);
 
   const playSound = (soundText: string) => {
     const filename = textToFilename(soundText);
@@ -51,34 +43,29 @@ export default function Home() {
 
     if (!/^[A-Z]$/.test(key)) return;
 
-    if (activeMoles.has(key)) {
-      if (moleTimers.current[key]) {
-        clearTimeout(moleTimers.current[key] as NodeJS.Timeout);
-      }
-
-      setActiveMoles(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(key);
-        return newSet;
-      });
+    // 如果当前有老鼠，检查按键是否匹配
+    if (activeMole && activeMole.letter === key) {
+      // 打中了！
+      clearTimeout(moleTimer.current as NodeJS.Timeout); // 清除超时定时器
+      setActiveMole(null);
       setCurrentHint(null);
       setScore(s => s + 1);
 
-      playSound("叮");
+      // 打中后出下一个题
+      setTimeout(() => {
+        startNewMole();
+      }, 500);
     }
-  }, [activeMoles, moleTimers]);
+  }, [activeMole]);
 
   useEffect(() => {
     window.addEventListener("keydown", handleKeyPress);
     return () => window.removeEventListener("keydown", handleKeyPress);
-  }, [handleKeyPress, activeMoles, moleTimers]);
+  }, [handleKeyPress, activeMole, score]);
 
+  // 游戏开始后自动出第一只老鼠
   useEffect(() => {
-    startSpawning();
-
-    return () => {
-      Object.values(moleTimers.current).forEach(timer => clearTimeout(timer as NodeJS.Timeout));
-    };
+    startNewMole();
   }, []);
 
   const keyboardRows = [
@@ -94,7 +81,7 @@ export default function Home() {
           打地鼠游戏
         </h1>
         <p className="text-lg text-green-600 dark:text-green-500 mb-4">
-          找到对应的字母按键，让老鼠回洞里去！
+          看动物，按对应字母键！
         </p>
         {currentHint && (
           <div className="inline-flex items-center gap-3 bg-yellow-100 dark:bg-yellow-900 px-6 py-3 rounded-2xl">
@@ -116,7 +103,7 @@ export default function Home() {
             <div key={rowIndex} className="flex justify-center gap-2">
               {row.map((key) => {
                 const animal = animals.find(a => a.letter === key);
-                const isActive = activeMoles.has(key);
+                const isActive = activeMole && activeMole.letter === key;
 
                 return (
                   <div
