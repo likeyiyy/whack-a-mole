@@ -1,63 +1,146 @@
-import Image from "next/image";
+"use client";
+
+import { useState, useEffect, useCallback, useRef } from "react";
+import { animals, textToFilename, type Animal } from "./data";
 
 export default function Home() {
+  const [activeMoles, setActiveMoles] = useState<Set<string>>(new Set());
+  const [currentHint, setCurrentHint] = useState<Animal | null>(null);
+  const [score, setScore] = useState(0);
+  const audioRef = useRef<HTMLAudioElement>(null);
+
+  // 随机选择一个动物冒出来
+  const spawnMole = useCallback(() => {
+    // 从未激活的洞中随机选择
+    const availableAnimals = animals.filter(a => !activeMoles.has(a.letter));
+    if (availableAnimals.length === 0) return;
+
+    const animal = availableAnimals[Math.floor(Math.random() * availableAnimals.length)];
+    setActiveMoles(prev => new Set([...prev, animal.letter]));
+
+    // 播放声音提示
+    playSound(animal.sound);
+
+    // 设置提示
+    setCurrentHint(animal);
+
+    // 5秒后自动收回（如果没按到）
+    setTimeout(() => {
+      setActiveMoles(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(animal.letter);
+        return newSet;
+      });
+      setCurrentHint(null);
+    }, 5000);
+  }, [activeMoles]);
+
+  // 播放声音
+  const playSound = (soundText: string) => {
+    const filename = textToFilename(soundText);
+    const url = `/audio/${filename}.mp3`;
+    const audio = new Audio(url);
+    audio.play().catch(console.error);
+  };
+
+  // 处理按键
+  const handleKeyPress = useCallback((e: KeyboardEvent) => {
+    const key = e.key.toUpperCase();
+
+    // 只处理 A-Z
+    if (!/^[A-Z]$/.test(key)) return;
+
+    // 如果这个字母有冒出来的老鼠
+    if (activeMoles.has(key)) {
+      // 打中了！
+      setActiveMoles(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(key);
+        return newSet;
+      });
+      setCurrentHint(null);
+      setScore(s => s + 1);
+
+      // 播放成功音效
+      playSound("叮");
+    }
+  }, [activeMoles]);
+
+  // 键盘监听
+  useEffect(() => {
+    window.addEventListener("keydown", handleKeyPress);
+    return () => window.removeEventListener("keydown", handleKeyPress);
+  }, [handleKeyPress]);
+
+  // 游戏开始后自动冒出第一个
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      spawnMole();
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 dark:from-gray-900 dark:to-gray-800 p-8">
+      {/* 头部 */}
+      <header className="text-center mb-8">
+        <h1 className="text-4xl font-bold text-green-800 dark:text-green-400 mb-2">
+          🐹 打地鼠游戏 🐹
+        </h1>
+        <p className="text-lg text-green-600 dark:text-green-500 mb-4">
+          找到对应的字母按键，让老鼠回洞里去！
+        </p>
+        {currentHint && (
+          <div className="inline-flex items-center gap-3 bg-yellow-100 dark:bg-yellow-900 px-6 py-3 rounded-2xl">
+            <span className="text-4xl">{currentHint.emoji}</span>
+            <span className="text-xl text-yellow-800 dark:text-yellow-400">
+              按 <span className="font-bold text-3xl text-red-600 dark:text-red-400">{currentHint.letter}</span> 键！
+              </span>
+          </div>
+        )}
+        <div className="text-2xl font-bold text-green-700 dark:text-green-400">
+          得分: {score}
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </header>
+
+      {/* 键盘布局 */}
+      <main className="max-w-4xl mx-auto">
+        <div className="grid grid-cols-10 gap-2 mb-4">
+          {animals.map((animal) => {
+            const isActive = activeMoles.has(animal.letter);
+
+            return (
+              <div
+                key={animal.letter}
+                className={`
+                  relative h-20 rounded-2xl border-4 border-green-300 dark:border-green-700
+                  bg-white dark:bg-gray-800
+                  flex items-center justify-center
+                  transition-all duration-200
+                  ${isActive ? 'ring-4 ring-red-500 scale-110' : 'hover:scale-105'}
+                `}
+              >
+                {/* 字母 */}
+                <span className={`text-4xl font-bold transition-all ${
+                  isActive ? 'text-red-600 dark:text-red-400' : 'text-green-700 dark:text-green-400'
+                }`}>
+                  {animal.letter}
+                </span>
+
+                {/* 老鼠冒头动画 */}
+                {isActive && (
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="text-6xl animate-bounce">{animal.emoji}</div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* 虚拟键盘（提示用） */}
+        <div className="mt-8 text-center text-sm text-green-600 dark:text-green-500">
+          💡 提示：你也可以直接按物理键盘上的 A-Z 字母键！
         </div>
       </main>
     </div>
