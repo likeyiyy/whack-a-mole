@@ -9,13 +9,16 @@ export default function Home() {
   const [score, setScore] = useState(0);
   const moleTimers = useRef<Record<string, NodeJS.Timeout>>({});
 
+  // 持续冒出老鼠：随机间隔选择新洞冒出
   const startSpawning = useCallback(() => {
+    // 每隔1-2秒随机冒出一只
     const spawnInterval = setInterval(() => {
       const availableAnimals = animals.filter(a => !activeMoles.has(a.letter));
       if (availableAnimals.length === 0) return;
 
       const animal = availableAnimals[Math.floor(Math.random() * availableAnimals.length)];
 
+      // 记录这个老鼠的定时器，用于后续收回
       if (moleTimers.current[animal.letter]) {
         clearTimeout(moleTimers.current[animal.letter] as NodeJS.Timeout);
       }
@@ -24,6 +27,7 @@ export default function Home() {
       playSound(animal.sound);
       setCurrentHint(animal);
 
+      // 7秒后自动收回（如果没被打中）
       const timer = setTimeout(() => {
         setActiveMoles(prev => {
           const newSet = new Set(prev);
@@ -34,11 +38,15 @@ export default function Home() {
       }, 7000);
 
       moleTimers.current[animal.letter] = timer as NodeJS.Timeout;
-    }, 1500);
+    }, 1000);
 
-    return () => clearInterval(spawnInterval);
-  }, [activeMoles]);
+    // 停止冒出
+    const stopSpawning = () => {
+      Object.values(moleTimers.current).forEach(timer => clearTimeout(timer as NodeJS.Timeout));
+      moleTimers.current = {} as Record<string, NodeJS.Timeout>;
+    };
 
+  // 播放声音
   const playSound = (soundText: string) => {
     const filename = textToFilename(soundText);
     const url = `/audio/${filename}.mp3`;
@@ -46,16 +54,21 @@ export default function Home() {
     audio.play().catch(console.error);
   };
 
+  // 处理按键
   const handleKeyPress = useCallback((e: KeyboardEvent) => {
     const key = e.key.toUpperCase();
 
+    // 只处理 A-Z
     if (!/^[A-Z]$/.test(key)) return;
 
+    // 如果这个字母有冒出来的老鼠
     if (activeMoles.has(key)) {
+      // 清除这个老鼠的定时器
       if (moleTimers.current[key]) {
         clearTimeout(moleTimers.current[key] as NodeJS.Timeout);
       }
 
+      // 打中了！
       setActiveMoles(prev => {
         const newSet = new Set(prev);
         newSet.delete(key);
@@ -64,34 +77,32 @@ export default function Home() {
       setCurrentHint(null);
       setScore(s => s + 1);
 
+      // 播放成功音效
       playSound("叮");
     }
   }, [activeMoles, moleTimers]);
 
+  // 键盘监听
   useEffect(() => {
     window.addEventListener("keydown", handleKeyPress);
     return () => window.removeEventListener("keydown", handleKeyPress);
   }, [handleKeyPress, activeMoles, moleTimers]);
 
+  // 游戏开始自动冒出
   useEffect(() => {
     startSpawning();
 
     return () => {
-      Object.values(moleTimers.current).forEach(timer => clearTimeout(timer as NodeJS.Timeout));
+      stopSpawning();
     };
   }, []);
 
-  const keyboardRows = [
-    ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
-    ["A", "S", "D", "F", "G", "H", "J", "K", "L"],
-    ["Z", "X", "C", "V", "B", "N", "M", ",", ".", "/"]
-  ];
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 dark:from-gray-900 dark:to-gray-800 p-8">
+      {/* 头部 */}
       <header className="text-center mb-8">
         <h1 className="text-4xl font-bold text-green-800 dark:text-green-400 mb-2">
-          打地鼠游戏
+          🐹 打地鼠游戏 🐹
         </h1>
         <p className="text-lg text-green-600 dark:text-green-500 mb-4">
           找到对应的字母按键，让老鼠回洞里去！
@@ -110,23 +121,33 @@ export default function Home() {
         </div>
       </header>
 
+      {/* 键盘布局 - QWERTY */}
       <main className="max-w-4xl mx-auto">
         <div className="space-y-2">
-          {keyboardRows.map((row, rowIndex) => (
+          {['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'].map((row, rowIndex) => (
             <div key={rowIndex} className="flex justify-center gap-2">
-              {row.map((key) => {
+              {['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'].map((key) => {
                 const animal = animals.find(a => a.letter === key);
                 const isActive = activeMoles.has(key);
 
                 return (
                   <div
                     key={key}
-                    className={`relative h-20 w-14 md:w-20 rounded-2xl border-4 border-green-300 dark:border-green-700 bg-white dark:bg-gray-800 flex items-center justify-center transition-all duration-200 ${isActive ? "ring-4 ring-red-500 scale-110" : "hover:scale-105"}`}
+                    className={`
+                      relative h-20 w-14 md:w-20 rounded-2xl border-4 border-green-300 dark:border-green-700
+                      bg-white dark:bg-gray-800
+                      flex items-center justify-center
+                      transition-all duration-200
+                      ${isActive ? 'ring-4 ring-red-500 scale-110' : 'hover:scale-105'}
+                    `}
                   >
-                    <span className={`text-2xl md:text-4xl font-bold transition-all ${isActive ? "text-red-600 dark:text-red-400" : "text-green-700 dark:text-green-400"}`}>
+                    <span className={`text-2xl md:text-4xl font-bold transition-all ${
+                      isActive ? 'text-red-600 dark:text-red-400' : 'text-green-700 dark:text-green-400'
+                    }`}>
                       {key}
                     </span>
 
+                    {/* 老鼠冒头动画 */}
                     {isActive && animal && (
                       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                         <div className="text-4xl md:text-5xl animate-bounce">{animal.emoji}</div>
@@ -139,8 +160,9 @@ export default function Home() {
           ))}
         </div>
 
+        {/* 提示 */}
         <div className="mt-8 text-center text-sm text-green-600 dark:text-green-500">
-          提示：你也可以直接按物理键盘上的 A-Z 字母键！
+          💡 提示：你也可以直接按物理键盘上的 A-Z 字母键！
         </div>
       </main>
     </div>
