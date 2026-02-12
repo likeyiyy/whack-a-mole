@@ -68,6 +68,7 @@ export default function Home() {
     startNewMole();
   }, []);
 
+  // QWERTY 键盘布局
   const keyboardRows = [
     ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
     ["A", "S", "D", "F", "G", "H", "J", "K", "L"],
@@ -75,29 +76,37 @@ export default function Home() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 dark:from-gray-900 dark:to-gray-800 p-8">
-      <header className="text-center mb-8">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 dark:from-gray-900 dark:to-gray-800 p-8 flex flex-col">
+      <header className="text-center mb-4 z-10">
         <h1 className="text-4xl font-bold text-green-800 dark:text-green-400 mb-2">
           打地鼠游戏
         </h1>
-        <p className="text-lg text-green-600 dark:text-green-500 mb-4">
-          看动物，按对应字母键！
-        </p>
-        {currentHint && (
-          <div className="inline-flex items-center gap-3 bg-yellow-100 dark:bg-yellow-900 px-6 py-3 rounded-2xl">
-            <span className="text-4xl">{currentHint.emoji}</span>
-            <span className="text-xl text-yellow-800 dark:text-yellow-400">
-              按 <span className="font-bold text-3xl text-red-600 dark:text-red-400">{currentHint.letter}</span> 键！
-              <span className="ml-2 text-sm">({currentHint.sound})</span>
-            </span>
-          </div>
-        )}
         <div className="text-2xl font-bold text-green-700 dark:text-green-400">
           得分: {score}
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto">
+      {/* 提示区域 - 固定在键盘下方 */}
+      <div className="flex-1 justify-center">
+        {currentHint && (
+          <div className="bg-yellow-100 dark:bg-yellow-900 px-6 py-4 rounded-2xl shadow-lg animate-pulse">
+            <div className="flex items-center gap-4">
+              <span className="text-5xl">{currentHint.emoji}</span>
+              <div className="text-left">
+                <div className="text-2xl font-bold text-yellow-800 dark:text-yellow-400">
+                  按 <span className="text-4xl text-red-600 dark:text-red-400">{currentHint.letter}</span> 键！
+                </div>
+                <div className="text-xl text-yellow-700 dark:text-yellow-600">
+                  ({currentHint.sound})
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 键盘布局 */}
+      <main className="flex-1 max-w-5xl mx-auto">
         <div className="space-y-2">
           {keyboardRows.map((row, rowIndex) => (
             <div key={rowIndex} className="flex justify-center gap-2">
@@ -124,10 +133,6 @@ export default function Home() {
               })}
             </div>
           ))}
-        </div>
-
-        <div className="mt-8 text-center text-sm text-green-600 dark:text-green-500">
-          提示：你也可以直接按物理键盘上的 A-Z 字母键！
         </div>
       </main>
     </div>
